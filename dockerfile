@@ -1,11 +1,14 @@
-# Use official PHP with Apache
-FROM php:8.2-apache
+# ============================================
+# PHP + Apache Server for Render Deployment
+# ============================================
 
-# Install required PHP extensions
-RUN docker-php-ext-install mysqli
+FROM php:8.1-apache
 
-# Enable Apache mod_rewrite (optional but good)
+# Enable Apache mod_rewrite
 RUN a2enmod rewrite
+
+# Install required PHP Extensions
+RUN docker-php-ext-install mysqli
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -13,11 +16,19 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Copy project into container
 COPY . /var/www/html/
 
-# Set working directory
+# Set document root (optional but clean)
 WORKDIR /var/www/html/
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader
+# Install PHP dependencies (Pusher)
+RUN composer require pusher/pusher-php-server
 
-# Apache will automatically serve index.php
-EXPOSE 80
+# Permissions
+RUN chown -R www-data:www-data /var/www/html
+
+# Render exposes PORT env variable — Apache must listen to it.
+# Replace the default 80 with the Render-provided port.
+RUN sed -i 's/80/${PORT}/g' /etc/apache2/sites-available/000-default.conf
+RUN sed -i 's/Listen 80/Listen ${PORT}/g' /etc/apache2/ports.conf
+
+# Start Apache
+CMD ["apache2-foreground"]
